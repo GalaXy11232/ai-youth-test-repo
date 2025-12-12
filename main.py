@@ -1,23 +1,22 @@
-import customtkinter
+import customtkinter as cTk
 from PIL import Image, ImageTk
 import re
 import easyocr
 import openfoodfacts 
 import tkinter.filedialog
+import os
 
-# --- CONFIGURATION ---
-# Language codes for the OCR Reader. 'en' for English is standard.
-# Add 'fr', 'de', etc., if you expect labels in other languages.
+# --- CONSTANTS ---
 EASYOCR_LANGUAGES = ['ro'] 
+
+OFF_COMMON_ALLERGENS = ["lapte", "soia", "gluten", "alune", "ouă", "lactoză"] 
+BAD_INGREDIENTS = {"zahăr", "benzoat de sodiu", "monoglutamat de sodiu", "sirop de porumb", "ulei hidrogenat"}
+
+SAVEFILE_PATH = 'allergens_save.data'
 # ---------------------
 
 
 # --- 1. CORE ANALYSIS FUNCTIONS ---
-
-# Dummy lists for scoring/analysis fallback
-OFF_COMMON_ALLERGENS = ["lapte", "soia", "gluten", "alune", "ouă", "lactoză"] 
-BAD_INGREDIENTS = {"zahăr", "benzoat de sodiu", "monoglutamat de sodiu", "sirop de porumb", "ulei hidrogenat"}
-
 def parse_ingredients(ocr_text):
     """Cleans raw OCR text and attempts to split it into a list of ingredients."""
     cleaned_text = ocr_text.lower().replace('\n', ' ').strip()
@@ -68,8 +67,7 @@ def perform_allergy_and_score_analysis(ingredients_list, user_allergies):
 
 
 # --- 2. GUI APPLICATION CLASS ---
-
-class NutriScanApp(customtkinter.CTk):
+class NutriScanApp(cTk.CTk):
     
     def __init__(self):
         super().__init__()
@@ -86,8 +84,8 @@ class NutriScanApp(customtkinter.CTk):
         self.user_allergies = []
         self.image_path = None
         
-        customtkinter.set_appearance_mode("System")
-        customtkinter.set_default_color_theme("green")
+        cTk.set_appearance_mode("System")
+        cTk.set_default_color_theme("green")
 
         self.create_widgets()
 
@@ -117,77 +115,91 @@ class NutriScanApp(customtkinter.CTk):
             return f"OCR Error during reading: {e}"
 
 
-    def create_widgets(self):
-        # --- (Widgets creation code remains the same as previous response, 
-        #      using CustomTkinter to build the interface) ---
-        
-        # --- Top Header Frame ---
-        self.header_frame = customtkinter.CTkFrame(self)
+    def create_widgets(self):        
+        self.header_frame = cTk.CTkFrame(self)
         self.header_frame.grid(row=0, column=0, columnspan=2, padx=20, pady=10, sticky="ew")
         self.header_frame.grid_columnconfigure((0, 1), weight=1)
 
-        self.title_label = customtkinter.CTkLabel(self.header_frame, text="🍏 NutriScan Ingredient Analyzer (EasyOCR)", 
-                                                  font=customtkinter.CTkFont(size=20, weight="bold"))
+        self.title_label = cTk.CTkLabel(
+            self.header_frame, 
+            text = "📜 Nutri-Label", 
+            font = cTk.CTkFont(size=20, weight="bold")
+        )
         self.title_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
         
         # --- User Input / Setup Frame ---
-        self.setup_frame = customtkinter.CTkFrame(self)
+        self.setup_frame = cTk.CTkFrame(self)
         self.setup_frame.grid(row=1, column=0, columnspan=2, padx=20, pady=5, sticky="ew")
         self.setup_frame.grid_columnconfigure((0, 1, 2), weight=1)
         
         # Allergy Input
-        self.allergy_label = customtkinter.CTkLabel(self.setup_frame, text="Allergies (comma-sep):")
+        self.allergy_label = cTk.CTkLabel(self.setup_frame, text="Allergies (comma separated):")
         self.allergy_label.grid(row=0, column=0, padx=10, pady=10, sticky="w")
         
-        self.allergy_entry = customtkinter.CTkEntry(self.setup_frame, placeholder_text="e.g., peanuts, milk, soy")
+
+        ## Load possible saved allergies from file
+        ## First check if file exists
+        if not os.path.isfile(SAVEFILE_PATH):
+            open(SAVEFILE_PATH, 'x')
+
+        stored_allergies = ""
+        with open(SAVEFILE_PATH, 'r') as f:
+            stored_allergies = f.read().strip()
+        allergies_var = cTk.StringVar(value=stored_allergies) if stored_allergies else None
+
+        self.allergy_entry = cTk.CTkEntry(self.setup_frame, textvariable = allergies_var, placeholder_text="e.g., peanuts, milk, soy")
         self.allergy_entry.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
-        
-        self.save_button = customtkinter.CTkButton(self.setup_frame, text="Save Allergies", command=self.save_allergies)
+
+        self.save_button = cTk.CTkButton(self.setup_frame, text="Save Allergies", command=self.save_allergies)
         self.save_button.grid(row=0, column=2, padx=10, pady=10, sticky="e")
         
         # --- Main Workspace Frame ---
-        self.main_frame = customtkinter.CTkFrame(self)
+        self.main_frame = cTk.CTkFrame(self)
         self.main_frame.grid(row=2, column=0, columnspan=2, padx=20, pady=10, sticky="nsew")
         self.main_frame.grid_columnconfigure(0, weight=1) 
         self.main_frame.grid_columnconfigure(1, weight=1) 
         self.main_frame.grid_rowconfigure(0, weight=1) 
 
         # Left Panel (Image and Controls)
-        self.image_frame = customtkinter.CTkFrame(self.main_frame)
+        self.image_frame = cTk.CTkFrame(self.main_frame)
         self.image_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
         self.image_frame.grid_rowconfigure(1, weight=1)
         self.image_frame.grid_columnconfigure(0, weight=1)
 
-        self.load_button = customtkinter.CTkButton(self.image_frame, text="📷 Load Label Image (JPG/PNG)", command=self.load_image)
+        self.load_button = cTk.CTkButton(self.image_frame, text="📷 Load Label Image (JPG/PNG)", command=self.load_image)
         self.load_button.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
-        self.image_display = customtkinter.CTkLabel(self.image_frame, text="Image Preview Area", width=450, height=450, fg_color=("gray70", "gray20"))
+        self.image_display = cTk.CTkLabel(self.image_frame, text="Image Preview Area", width=450, height=450, fg_color=("gray70", "gray20"))
         self.image_display.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
         
-        self.analyze_button = customtkinter.CTkButton(self.image_frame, text="🔬 Run Analysis", command=self.run_analysis, fg_color="darkgreen", hover_color="#005500")
+        self.analyze_button = cTk.CTkButton(self.image_frame, text="🔬 Run Analysis", command=self.run_analysis, fg_color="darkgreen", hover_color="#005500")
         self.analyze_button.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
 
         # Right Panel (Results)
-        self.result_frame = customtkinter.CTkFrame(self.main_frame)
+        self.result_frame = cTk.CTkFrame(self.main_frame)
         self.result_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
         self.result_frame.grid_rowconfigure(3, weight=1)
 
-        self.score_label = customtkinter.CTkLabel(self.result_frame, text="Nutritional Score: N/A", 
-                                                  font=customtkinter.CTkFont(size=24, weight="bold"))
+        self.score_label = cTk.CTkLabel(self.result_frame, text="Nutritional Score: N/A", 
+                                                  font=cTk.CTkFont(size=24, weight="bold"))
         self.score_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
 
-        self.allergy_label = customtkinter.CTkLabel(self.result_frame, text="Allergy Status: Ready", 
-                                                    font=customtkinter.CTkFont(size=16), text_color="green")
+        self.allergy_label = cTk.CTkLabel(self.result_frame, text="Allergy Status: Ready", 
+                                                    font=cTk.CTkFont(size=16), text_color="green")
         self.allergy_label.grid(row=1, column=0, padx=20, pady=5, sticky="w")
         
-        self.raw_label = customtkinter.CTkLabel(self.result_frame, text="Raw OCR Text:", font=customtkinter.CTkFont(size=14, weight="bold"))
+        self.raw_label = cTk.CTkLabel(self.result_frame, text="Raw OCR Text:", font=cTk.CTkFont(size=14, weight="bold"))
         self.raw_label.grid(row=2, column=0, padx=20, pady=5, sticky="w")
 
-        self.raw_text_box = customtkinter.CTkTextbox(self.result_frame, height=400)
+        self.raw_text_box = cTk.CTkTextbox(self.result_frame, height=400)
         self.raw_text_box.grid(row=3, column=0, padx=20, pady=10, sticky="nsew")
 
+        # Finally, load allergies if existent
+        if allergies_var:
+            self.save_allergies(to_file = False)
 
-    def save_allergies(self):
+
+    def save_allergies(self, to_file = True):
         """Saves user allergies from the entry field."""
         raw_text = self.allergy_entry.get()
         self.user_allergies = [a.strip().lower() for a in raw_text.split(',') if a.strip()]
@@ -198,6 +210,11 @@ class NutriScanApp(customtkinter.CTk):
         else:
             self.save_button.configure(text="Save Allergies", fg_color="darkgreen")
             self.allergy_label.configure(text="Allergy Status: None Set", text_color="green")
+        
+        ## Also consider saving data to file
+        if to_file:
+            with open(SAVEFILE_PATH, 'w') as f:
+                f.write(', '.join(self.user_allergies))
 
     def load_image(self):
         """Opens a file dialog and displays the selected image."""
