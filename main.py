@@ -7,7 +7,7 @@ import tkinter.filedialog
 import os
 
 # --- CONSTANTS ---
-EASYOCR_LANGUAGES = ['ro'] 
+EASYOCR_LANGUAGES = ['en', 'ro'] 
 
 OFF_COMMON_ALLERGENS = ["lapte", "soia", "gluten", "alune", "ouă", "lactoză"] 
 BAD_INGREDIENTS = {"zahăr", "benzoat de sodiu", "monoglutamat de sodiu", "sirop de porumb", "ulei hidrogenat"}
@@ -113,7 +113,7 @@ class NutriScanApp(cTk.CTk):
         # return
         """Initializes the EasyOCR reader with specified languages."""
         try:
-            reader = easyocr.Reader(EASYOCR_LANGUAGES)
+            reader = easyocr.Reader(EASYOCR_LANGUAGES, gpu = True)
             print("EasyOCR Reader initialized successfully.")
             return reader
         except Exception as e:
