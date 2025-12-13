@@ -12,11 +12,31 @@ EASYOCR_LANGUAGES = ['ro']
 OFF_COMMON_ALLERGENS = ["lapte", "soia", "gluten", "alune", "ouă", "lactoză"] 
 BAD_INGREDIENTS = {"zahăr", "benzoat de sodiu", "monoglutamat de sodiu", "sirop de porumb", "ulei hidrogenat"}
 
-SAVEFILE_PATH = 'allergens_save.data'
+## Savefile into local data folder
+SAVEFILE_NAME = 'allergens_save.data'
+SAVEFILE_DIRPATH = os.environ['USERPROFILE'] + '\\Appdata\\Local\\NutriLabel\\'
+SAVEFILE_PATH = SAVEFILE_DIRPATH + SAVEFILE_NAME
+os.mkdir(SAVEFILE_DIRPATH) if not os.path.exists(SAVEFILE_DIRPATH) else None
 # ---------------------
 
 
 # --- 1. CORE ANALYSIS FUNCTIONS ---
+def remove_diacritics(text):
+    replace = {
+        'ă': 'a', 'â': 'a', 'î': 'i', 'ș': 's', 'ț': 't',
+        'Ă': 'A', 'Â': 'A', 'Î': 'I', 'Ș': 'S', 'Ț': 'T'
+    }
+
+    for diacr, repl in replace.items():
+        text = text.replace(diacr, repl)
+    
+    return text
+
+## Preremove diacritics (yes it's outside the function womp womp)
+OFF_COMMON_ALLERGENS = [remove_diacritics(a) for a in OFF_COMMON_ALLERGENS]
+BAD_INGREDIENTS = {remove_diacritics(a) for a in BAD_INGREDIENTS}
+
+
 def parse_ingredients(ocr_text):
     """Cleans raw OCR text and attempts to split it into a list of ingredients."""
     cleaned_text = ocr_text.lower().replace('\n', ' ').strip()
@@ -38,11 +58,11 @@ def parse_ingredients(ocr_text):
 def perform_allergy_and_score_analysis(ingredients_list, user_allergies):
     """Analyzes ingredients against user allergies and calculates a simple score."""
     detected_allergens = set()
-    user_allergies_lower = {a.lower() for a in user_allergies}
+    user_allergies_lower = {remove_diacritics(a.lower()) for a in user_allergies}
     score = 0
-    
+
     for ingredient in ingredients_list:
-        ingredient_lower = ingredient.lower()
+        ingredient_lower = remove_diacritics(ingredient.lower())
         
         # Check against common and user-specific allergens
         for allergen in OFF_COMMON_ALLERGENS + list(user_allergies_lower):
@@ -76,7 +96,7 @@ class NutriScanApp(cTk.CTk):
         self.ocr_reader = self._initialize_easyocr_reader()
         
         # Configure window
-        self.title("NutriScan Desktop Analyzer (EasyOCR)")
+        self.title("Nutri-Label App")
         self.geometry(f"{1000}x{700}")
         self.grid_columnconfigure((0, 1), weight=1)
         self.grid_rowconfigure(2, weight=1)
@@ -90,6 +110,7 @@ class NutriScanApp(cTk.CTk):
         self.create_widgets()
 
     def _initialize_easyocr_reader(self):
+        # return
         """Initializes the EasyOCR reader with specified languages."""
         try:
             reader = easyocr.Reader(EASYOCR_LANGUAGES)
@@ -123,9 +144,9 @@ class NutriScanApp(cTk.CTk):
         self.title_label = cTk.CTkLabel(
             self.header_frame, 
             text = "📜 Nutri-Label", 
-            font = cTk.CTkFont(size=20, weight="bold")
+            font = cTk.CTkFont(size=36, weight="bold")
         )
-        self.title_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
+        self.title_label.grid(row=0, column=0, padx=20, pady=10, sticky = 'e')
         
         # --- User Input / Setup Frame ---
         self.setup_frame = cTk.CTkFrame(self)
@@ -202,7 +223,10 @@ class NutriScanApp(cTk.CTk):
     def save_allergies(self, to_file = True):
         """Saves user allergies from the entry field."""
         raw_text = self.allergy_entry.get()
-        self.user_allergies = [a.strip().lower() for a in raw_text.split(',') if a.strip()]
+        self.user_allergies = [
+            remove_diacritics(a.strip()) 
+            for a in raw_text.split(',') if a.strip()
+        ]
         
         if self.user_allergies:
             self.save_button.configure(text=f"Saved ({len(self.user_allergies)})", fg_color="green")
@@ -228,15 +252,23 @@ class NutriScanApp(cTk.CTk):
             
             # Display image in the GUI
             original_img = Image.open(self.image_path)
+
+            image_aspect_ratio = original_img.width / original_img.height  
+            max_ratio_bound = 1.75
+            # Image can maybe be rescaled into a 1:1 box
+            target_width, target_height = 425, 425
+            ideal_width, ideal_height = 300, 300
             
-            # Resize while maintaining aspect ratio
-            target_width = 450
-            target_height = 450
-            original_img.thumbnail((target_width, target_height))
-            
-            self.img_tk = ImageTk.PhotoImage(original_img)
-            self.image_display.configure(image=self.img_tk, text="")
-            self.image_display.image = self.img_tk
+            self.img_ctk = cTk.CTkImage(
+                light_image = original_img,
+                dark_image = original_img,
+                size = (
+                    target_width if image_aspect_ratio <= max_ratio_bound else original_img.width * ideal_height // original_img.height, 
+                    target_height if image_aspect_ratio <= max_ratio_bound else original_img.height * ideal_width // original_img.width
+                )
+            )
+            self.image_display.configure(image = self.img_ctk, text = '')
+            self.image_display.image = self.img_ctk ## Keeps a reference to avoid garbage collection (cred)
             
             # Reset results display
             self.score_label.configure(text="Nutritional Score: Ready to Scan")
@@ -274,14 +306,14 @@ class NutriScanApp(cTk.CTk):
         self.score_label.configure(text=f"Nutritional Score: {score_grade}")
         
         if "A" in score_grade:
-             self.score_label.configure(text_color="green")
+            self.score_label.configure(text_color="green")
         elif "D" in score_grade:
-             self.score_label.configure(text_color="red")
+            self.score_label.configure(text_color="red")
         else:
-             self.score_label.configure(text_color="orange")
+            self.score_label.configure(text_color="orange")
 
         if allergens:
-            allergy_msg = f"🚫 WARNING: Contains: {', '.join(allergens)}"
+            allergy_msg = f"🚫 WARNING! Contains: {', '.join(allergens)}"
             self.allergy_label.configure(text=allergy_msg, text_color="red")
         else:
             self.allergy_label.configure(text="✅ All Clear: No Allergens Detected", text_color="green")
