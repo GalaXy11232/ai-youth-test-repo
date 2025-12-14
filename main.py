@@ -1,8 +1,7 @@
 import customtkinter as cTk
-from PIL import Image, ImageTk
+from PIL import Image
 import re
 import easyocr
-import openfoodfacts 
 import tkinter.filedialog
 import os
 
@@ -22,6 +21,11 @@ BAD_INGREDIENTS = {
     'E222', 'E221', 'E220', 'E219', 'E218', 'E215', 'E214', 'E213', 'E212', 'E211', 'E210', 'E155', 'E154', 'E1520', 
     'E515', 'E128', 'E127', 'E1202', 'E1201' # Euri periculoase
 }
+
+PRO_INGREDIENTS = [
+    "fibre", "vitamina", "minerale", "proteine", "omega-3", "probiotice", # Romanian
+    "fiber", "vitamin", "mineral", "protein", "omega-3", "probiotics"  # English
+]
 
 ## Savefile into local data folder
 SAVEFILE_NAME = 'allergens_save.data'
@@ -83,20 +87,20 @@ def perform_allergy_and_score_analysis(ingredients_list, user_allergies):
             if bad in ingredient_lower:
                 score -= 5
                 
-        if "whole grain" in ingredient_lower or "fiber" in ingredient_lower or "protein" in ingredient_lower:
+        if ingredient_lower in PRO_INGREDIENTS:
             score += 3
             
     # Convert score to a grade
-    if score >= 5: score_grade = "A (Excellent)"
-    elif score >= 0: score_grade = "B (Good)"
-    elif score >= -5: score_grade = "C (Fair)"
-    else: score_grade = "D (Poor)"
+    if score >= 5: score_grade = "A (Excelent)"
+    elif score >= 0: score_grade = "B (Bun)"
+    elif score >= -5: score_grade = "C (Decent)"
+    else: score_grade = "D (Slab calitativ)"
     
     return list(detected_allergens), score_grade
 
 
 # --- 2. GUI APPLICATION CLASS ---
-class NutriScanApp(cTk.CTk):
+class NLApp(cTk.CTk):
     
     def __init__(self):
         super().__init__()
@@ -105,7 +109,7 @@ class NutriScanApp(cTk.CTk):
         self.ocr_reader = self._initialize_easyocr_reader()
         
         # Configure window
-        self.title("Nutri-Label App")
+        self.title("📜 Nutri-Label")
         self.geometry(f"{1000}x{700}")
         self.grid_columnconfigure((0, 1), weight=1)
         self.grid_rowconfigure(2, weight=1)
@@ -121,15 +125,15 @@ class NutriScanApp(cTk.CTk):
     def _initialize_easyocr_reader(self):        
         try:
             reader = easyocr.Reader(EASYOCR_LANGUAGES, gpu = True)
-            print("EasyOCR Reader initialized successfully.")
+            print("EasyOCR Reader initializat cu succes.")
             return reader
         except Exception as e:
-            print(f"Error initializing EasyOCR: {e}")
+            print(f"Eroare la initializarea EasyOCR: {e}")
             return None
     
     def get_text_from_image(self, image_path):
         if not self.ocr_reader:
-            return "OCR Error: EasyOCR Reader failed to initialize."
+            return "OCR Error: EasyOCR Reader failed."
         
         try:
             # Read the image using the EasyOCR reader instance
@@ -149,7 +153,7 @@ class NutriScanApp(cTk.CTk):
 
         self.title_label = cTk.CTkLabel(
             self.header_frame, 
-            text = "📜 Nutri-Label", 
+            text = "Nutri-Label", 
             font = cTk.CTkFont(size=36, weight="bold")
         )
         self.title_label.grid(row=0, column=0, padx=20, pady=10, sticky = 'e')
@@ -160,7 +164,7 @@ class NutriScanApp(cTk.CTk):
         self.setup_frame.grid_columnconfigure((0, 1, 2), weight=1)
         
         # Allergy Input
-        self.allergy_label = cTk.CTkLabel(self.setup_frame, text="Allergies (comma separated):")
+        self.allergy_label = cTk.CTkLabel(self.setup_frame, text="Alergii (separate prin virgula):")
         self.allergy_label.grid(row=0, column=0, padx=10, pady=10, sticky="w")
         
 
@@ -174,7 +178,7 @@ class NutriScanApp(cTk.CTk):
             stored_allergies = f.read().strip()
         allergies_var = cTk.StringVar(value=stored_allergies) if stored_allergies else None
 
-        self.allergy_entry = cTk.CTkEntry(self.setup_frame, textvariable = allergies_var, placeholder_text="e.g., peanuts, milk, soy")
+        self.allergy_entry = cTk.CTkEntry(self.setup_frame, textvariable = allergies_var, placeholder_text="e.g., lapte, gluten, soia")
         self.allergy_entry.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
 
         self.save_button = cTk.CTkButton(self.setup_frame, text="Save Allergies", command=self.save_allergies)
@@ -193,13 +197,13 @@ class NutriScanApp(cTk.CTk):
         self.image_frame.grid_rowconfigure(1, weight=1)
         self.image_frame.grid_columnconfigure(0, weight=1)
 
-        self.load_button = cTk.CTkButton(self.image_frame, text="📷 Load Label Image (JPG/PNG)", command=self.load_image)
+        self.load_button = cTk.CTkButton(self.image_frame, text="📷 Incarca lista de ingrediente (JPG/PNG)", command=self.load_image)
         self.load_button.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
-        self.image_display = cTk.CTkLabel(self.image_frame, text="Image Preview Area", width=450, height=450, fg_color=("gray70", "gray20"))
+        self.image_display = cTk.CTkLabel(self.image_frame, text="Imaginea afisata", width=450, height=450, fg_color=("gray70", "gray20"))
         self.image_display.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
         
-        self.analyze_button = cTk.CTkButton(self.image_frame, text="🔬 Run Analysis", command=self.run_analysis, fg_color="darkgreen", hover_color="#005500")
+        self.analyze_button = cTk.CTkButton(self.image_frame, text="Incepe scanarea", command=self.run_analysis, fg_color="darkgreen", hover_color="#005500")
         self.analyze_button.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
 
         # Right Panel (Results)
@@ -207,13 +211,13 @@ class NutriScanApp(cTk.CTk):
         self.result_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
         self.result_frame.grid_rowconfigure(3, weight=1)
 
-        self.score_label = cTk.CTkLabel(self.result_frame, text="Nutritional Score: N/A", font=cTk.CTkFont(size=24, weight="bold"))
+        self.score_label = cTk.CTkLabel(self.result_frame, text="Scor nutritional: N/A", font=cTk.CTkFont(size=24, weight="bold"))
         self.score_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
 
-        self.allergy_label = cTk.CTkLabel(self.result_frame, text="Allergy Status: Ready", font=cTk.CTkFont(size=16), text_color="green")
+        self.allergy_label = cTk.CTkLabel(self.result_frame, text="Statusul alergiilor: Gata", font=cTk.CTkFont(size=16), text_color="green")
         self.allergy_label.grid(row=1, column=0, padx=20, pady=5, sticky="w")
         
-        self.raw_label = cTk.CTkLabel(self.result_frame, text="Raw OCR Text:", font=cTk.CTkFont(size=14, weight="bold"))
+        self.raw_label = cTk.CTkLabel(self.result_frame, text="Text identificat: ", font=cTk.CTkFont(size=14, weight="bold"))
         self.raw_label.grid(row=2, column=0, padx=20, pady=5, sticky="w")
 
         self.raw_text_box = cTk.CTkTextbox(self.result_frame, height=400)
@@ -232,11 +236,11 @@ class NutriScanApp(cTk.CTk):
         ]
         
         if self.user_allergies:
-            self.save_button.configure(text=f"Saved ({len(self.user_allergies)})", fg_color="green")
-            self.allergy_label.configure(text=f"Allergy Status: {', '.join(self.user_allergies).capitalize()}", text_color="orange")
+            self.save_button.configure(text=f"Salvat {len(self.user_allergies)} " + ("alergie" if len(self.user_allergies) == 1 else "alergii"), fg_color="green")
+            self.allergy_label.configure(text=f"Status alergii: {', '.join(self.user_allergies).capitalize()}", text_color="orange")
         else:
-            self.save_button.configure(text="Save Allergies", fg_color="darkgreen")
-            self.allergy_label.configure(text="Allergy Status: None Set", text_color="green")
+            self.save_button.configure(text="Salvat alergii", fg_color="darkgreen")
+            self.allergy_label.configure(text="Status alergii: Nu a fost setat", text_color="green")
         
         ## Also consider saving data to file
         if to_file:
@@ -273,21 +277,21 @@ class NutriScanApp(cTk.CTk):
             self.image_display.image = self.img_ctk ## Keeps a reference to avoid garbage collection (cred)
             
             # Reset results display
-            self.score_label.configure(text="Nutritional Score: Ready to Scan")
-            self.allergy_label.configure(text="Allergy Status: Ready to Scan", text_color="green")
+            self.score_label.configure(text="Scor nutritional: Gata de scanare")
+            self.allergy_label.configure(text="Scor alergii: Gata de scanare", text_color="green")
             self.raw_text_box.delete("1.0", "end")
 
 
     def run_analysis(self):
         if not self.image_path:
-            self.score_label.configure(text="ERROR: Please Load an Image First", text_color="red")
+            self.score_label.configure(text="ERROR: Intai incarca o imagine", text_color="red")
             return
         
         if not self.ocr_reader:
-            self.score_label.configure(text="CRITICAL ERROR: OCR Not Initialized", text_color="red")
+            self.score_label.configure(text="ERROR: OCR neinitalizat", text_color="red")
             return
 
-        self.score_label.configure(text="Analyzing...", text_color="gray")
+        self.score_label.configure(text="Analizeaza...", text_color="gray")
         
         # 1. OCR using EasyOCR method
         raw_ocr_text = self.get_text_from_image(self.image_path)
@@ -314,12 +318,12 @@ class NutriScanApp(cTk.CTk):
             self.score_label.configure(text_color="orange")
 
         if allergens:
-            allergy_msg = f"🚫 WARNING! Contains: {', '.join(allergens)}"
+            allergy_msg = f"🚫 ATENTIE! Contine: {', '.join(allergens)}"
             self.allergy_label.configure(text=allergy_msg, text_color="red")
         else:
-            self.allergy_label.configure(text="✅ All Clear: No Allergens Detected", text_color="green")
+            self.allergy_label.configure(text="✅ Totul bine: Nu au fost detectate alergii", text_color="green")
             
 
 if __name__ == "__main__":
-    app = NutriScanApp()
+    app = NLApp()
     app.mainloop()
