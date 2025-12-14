@@ -9,8 +9,19 @@ import os
 # --- CONSTANTS ---
 EASYOCR_LANGUAGES = ['en', 'ro'] 
 
-OFF_COMMON_ALLERGENS = ["lapte", "soia", "gluten", "alune", "ouă", "lactoză"] 
-BAD_INGREDIENTS = {"zahăr", "benzoat de sodiu", "monoglutamat de sodiu", "sirop de porumb", "ulei hidrogenat"}
+OFF_COMMON_ALLERGENS = [
+    "lapte", "soia", "gluten", "alune", "oua", "lactoza", "nuci", "peste", "mustar", "susan", # Romanian
+    "milk", "soy", "gluten", "peanuts", "eggs", "lactose", "nuts", "fish", "mustard", "sesame"  # English
+] 
+BAD_INGREDIENTS = {
+    "zahar", "benzoat de sodiu", "monoglutamat de sodiu", "sirop de porumb", "ulei hidrogenat", # Romanian
+    "sugar", "sodium benzoate", "monosodium glutamate", "corn syrup", "hydrogenated oil",  # English
+
+    'E999', 'E954', 'E952', 'E950', 'E621', 'E517', 'E436', 'E435', 'E434', 'E433', 'E432', 'E407', 'E330', 'E312', 
+    'E311', 'E310', 'E285', 'E284', 'E249', 'E242', 'E232', 'E231', 'E230', 'E228', 'E227', 'E226', 'E224', 'E223', 
+    'E222', 'E221', 'E220', 'E219', 'E218', 'E215', 'E214', 'E213', 'E212', 'E211', 'E210', 'E155', 'E154', 'E1520', 
+    'E515', 'E128', 'E127', 'E1202', 'E1201' # Euri periculoase
+}
 
 ## Savefile into local data folder
 SAVEFILE_NAME = 'allergens_save.data'
@@ -38,7 +49,6 @@ BAD_INGREDIENTS = {remove_diacritics(a) for a in BAD_INGREDIENTS}
 
 
 def parse_ingredients(ocr_text):
-    """Cleans raw OCR text and attempts to split it into a list of ingredients."""
     cleaned_text = ocr_text.lower().replace('\n', ' ').strip()
     
     # Simple heuristic to find the ingredient list
@@ -56,7 +66,6 @@ def parse_ingredients(ocr_text):
     return ingredients
 
 def perform_allergy_and_score_analysis(ingredients_list, user_allergies):
-    """Analyzes ingredients against user allergies and calculates a simple score."""
     detected_allergens = set()
     user_allergies_lower = {remove_diacritics(a.lower()) for a in user_allergies}
     score = 0
@@ -109,9 +118,7 @@ class NutriScanApp(cTk.CTk):
 
         self.create_widgets()
 
-    def _initialize_easyocr_reader(self):
-        # return
-        """Initializes the EasyOCR reader with specified languages."""
+    def _initialize_easyocr_reader(self):        
         try:
             reader = easyocr.Reader(EASYOCR_LANGUAGES, gpu = True)
             print("EasyOCR Reader initialized successfully.")
@@ -121,7 +128,6 @@ class NutriScanApp(cTk.CTk):
             return None
     
     def get_text_from_image(self, image_path):
-        """Uses EasyOCR to extract text from an image."""
         if not self.ocr_reader:
             return "OCR Error: EasyOCR Reader failed to initialize."
         
@@ -201,12 +207,10 @@ class NutriScanApp(cTk.CTk):
         self.result_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
         self.result_frame.grid_rowconfigure(3, weight=1)
 
-        self.score_label = cTk.CTkLabel(self.result_frame, text="Nutritional Score: N/A", 
-                                                  font=cTk.CTkFont(size=24, weight="bold"))
+        self.score_label = cTk.CTkLabel(self.result_frame, text="Nutritional Score: N/A", font=cTk.CTkFont(size=24, weight="bold"))
         self.score_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
 
-        self.allergy_label = cTk.CTkLabel(self.result_frame, text="Allergy Status: Ready", 
-                                                    font=cTk.CTkFont(size=16), text_color="green")
+        self.allergy_label = cTk.CTkLabel(self.result_frame, text="Allergy Status: Ready", font=cTk.CTkFont(size=16), text_color="green")
         self.allergy_label.grid(row=1, column=0, padx=20, pady=5, sticky="w")
         
         self.raw_label = cTk.CTkLabel(self.result_frame, text="Raw OCR Text:", font=cTk.CTkFont(size=14, weight="bold"))
@@ -221,7 +225,6 @@ class NutriScanApp(cTk.CTk):
 
 
     def save_allergies(self, to_file = True):
-        """Saves user allergies from the entry field."""
         raw_text = self.allergy_entry.get()
         self.user_allergies = [
             remove_diacritics(a.strip()) 
@@ -241,7 +244,6 @@ class NutriScanApp(cTk.CTk):
                 f.write(', '.join(self.user_allergies))
 
     def load_image(self):
-        """Opens a file dialog and displays the selected image."""
         filepath = tkinter.filedialog.askopenfilename(
             title="Select Ingredient Label Image",
             filetypes=(("Image files", "*.png *.jpg *.jpeg"), ("All files", "*.*"))
@@ -277,7 +279,6 @@ class NutriScanApp(cTk.CTk):
 
 
     def run_analysis(self):
-        """Performs OCR and analysis on the loaded image."""
         if not self.image_path:
             self.score_label.configure(text="ERROR: Please Load an Image First", text_color="red")
             return
