@@ -260,7 +260,7 @@ class NLApp(cTk.CTk):
             original_img = Image.open(self.image_path)
 
             image_aspect_ratio = original_img.width / original_img.height  
-            max_ratio_bound = 1.75
+            max_ratio_bound = 2.0
             # Image can maybe be rescaled into a 1:1 box
             target_width, target_height = 425, 425
             ideal_width, ideal_height = 300, 300
